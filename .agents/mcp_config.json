@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "publisher": {
+      "command": "/home/kalnig/Desktop/Projects/AI_Publisher_Agent/.venv/bin/python",
+      "args": [
+        "-m",
+        "publisher_mcp.server"
+      ],
+      "env": {
+        "SQLITE_DB_PATH": "data/publisher.db"
+      }
+    }
+  }
+}
