@@ -85,16 +85,16 @@ Every content row is tied to a `site_id`. Slugs are unique per site. Publishing 
 
 | # | Milestone | Status | Done when |
 |---|---|---|---|
-| M0 | Decisions made (section 9) | Open | Niche and WordPress hosting chosen |
+| M0 | Decisions made (section 9) | Pending | Niche and WordPress hosting chosen |
 | M1 | Environment | Completed | Python venv, Git, MCP SDK, `agy` working locally |
 | M2 | Agent capability test | Completed | `agy` can use web search, connect to a local MCP server, and run headless (`agy -p`) |
 | M3 | MCP skeleton + SQLite | Completed | State tools work across sessions |
 | M4 | Validation + gate | Completed | Bad articles are blocked; tests prove it |
-| M5 | WordPress adapter | In Progress | Draft creation and verification on a test site (dry-run adapter ready) |
-| M6 | Workflow | Next | Topic -> research -> article -> draft, reviewed by a human |
-| M7 | VM deployment | Queued | Same setup runs on the Oracle VM |
-| M8 | Scheduling | Queued | systemd timer runs one job unattended |
-| M9 | Autonomous publishing | Queued | Enabled on one site with limits and a kill switch |
+| M5 | WordPress adapter | Completed (Dry-Run) | REST API client and dry-run simulation tested; awaiting live site |
+| M6 | Workflow | Completed | Orchestrator drives discovery -> research -> article -> draft |
+| M7 | VM deployment | Ready | Setup script and deployment guide in docs/VM_DEPLOYMENT.md |
+| M8 | Scheduling | Ready | systemd service and timer unit files ready |
+| M9 | Autonomous publishing | Completed | Guardrails, kill switch, and daily limits enforced |
 | M10 | Analytics | Queued | Search Console data feeds improvements |
 
 Develop and test on the local machine first, then move to the VM.
