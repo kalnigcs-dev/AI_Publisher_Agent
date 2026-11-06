@@ -1,0 +1,15 @@
+[Unit]
+Description=Timer for AI Publisher Autonomous Workflow
+Requires=ai-publisher.service
+
+[Timer]
+# Run daily at 04:00 UTC (or adjust to your preferred cadence)
+OnCalendar=*-*-* 04:00:00
+# Run 10 minutes after boot to catch up if needed
+OnBootSec=10min
+# Add slight jitter to avoid fixed spike timing
+RandomizedDelaySec=300
+Persistent=true
+
+[Install]
+WantedBy=timers.target

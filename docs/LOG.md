@@ -13,6 +13,9 @@
 - Completed Milestone 3 (MCP skeleton + SQLite): Built SQLite data models (`schema.sql` and `db.py`) covering sites, topics, research, articles, versions, validations, and publications. Built state tools.
 - Completed Milestone 4 (Validation + publishing gate): Implemented `ArticleValidator` in `engine.py` (prohibiting bad tags, YMYL keywords, h1 tags, requiring verified sources and metadata). Added strict gate blocking `publish_article` unless state is `APPROVED`.
 - Completed Milestone 5 Foundation (WordPress adapter): Built `WordPressClient` in `integrations/wordpress.py` with support for dry-run simulation and REST API authentication. End-to-end pipeline tested (12 unit and integration tests passing).
+- Completed Milestone 6 (Workflow Orchestration): Built `PipelineOrchestrator` in `orchestrator.py` to drive discovery -> research -> writing -> validation -> draft publication. Added CLI commands for manual or cron execution.
+- Completed Milestone 7 & 8 (VM Deployment & Scheduling): Created `scripts/setup_vm.sh`, `systemd/ai-publisher.service`, `systemd/ai-publisher.timer`, and comprehensive deployment documentation in `docs/VM_DEPLOYMENT.md`.
+- Completed Milestone 9 (Guardrails & Limits): Enforced kill switch (`PUBLISHING_ENABLED`), dry-run mode, and daily rate limit checks (`MAX_POSTS_PER_DAY`) at the publishing gate. 15 unit and integration tests passing.
 
 ### What broke
 - `mcp.server.fastmcp` was renamed in `mcp 2.x` to `mcp.server.mcpserver.MCPServer`. Resolved by using `MCPServer`.

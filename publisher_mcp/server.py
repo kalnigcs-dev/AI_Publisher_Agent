@@ -225,7 +225,7 @@ def validate_article(article_id: int) -> Dict[str, Any]:
 @mcp.tool()
 def publish_article(article_id: int, as_draft: bool = True) -> Dict[str, Any]:
     """Quality-gated publishing tool. Strictly blocked unless the article has passed validation."""
-    allowed, reason = db.can_publish_article(article_id)
+    allowed, reason = db.can_publish_article(article_id, as_draft=as_draft)
     if not allowed:
         return {
             "status": "blocked",

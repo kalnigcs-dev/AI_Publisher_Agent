@@ -1,0 +1,15 @@
+[Unit]
+Description=AI Publisher Autonomous Workflow Runner
+After=network.target
+
+[Service]
+Type=oneshot
+# Adjust WorkingDirectory and User to match your target VM user and path
+WorkingDirectory=%h/ai-publisher
+EnvironmentFile=-%h/ai-publisher/.env
+ExecStart=%h/ai-publisher/.venv/bin/python -m publisher_mcp.orchestrator --step cycle
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

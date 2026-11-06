@@ -341,8 +341,24 @@ def get_latest_validation(article_id: int, db_path: Optional[str] = None) -> Opt
         return d
 
 
-def can_publish_article(article_id: int, db_path: Optional[str] = None) -> tuple[bool, str]:
-    """Strict publishing gate: Only APPROVED articles with passing validation can be published."""
+def get_today_publication_count(site_id: int, db_path: Optional[str] = None) -> int:
+    with get_connection(db_path) as conn:
+        row = conn.execute(
+            """
+            SELECT COUNT(*) as count FROM publications
+            WHERE site_id = ? AND date(created_at) = date('now') AND status != 'FAILED'
+            """,
+            (site_id,),
+        ).fetchone()
+        return row["count"] if row else 0
+
+
+def can_publish_article(
+    article_id: int,
+    as_draft: bool = True,
+    db_path: Optional[str] = None,
+) -> tuple[bool, str]:
+    """Strict publishing gate: Only APPROVED articles with passing validation and within limits can be published."""
     article = get_article(article_id, db_path=db_path)
     if not article:
         return False, f"Article {article_id} not found."
@@ -356,6 +372,22 @@ def can_publish_article(article_id: int, db_path: Optional[str] = None) -> tuple
 
     if latest_val.get("version_id") != article.get("current_version_id"):
         return False, "Validation record does not match current article version."
+
+    # Kill switch guardrail for live publishing
+    if not as_draft:
+        publishing_enabled = os.getenv("PUBLISHING_ENABLED", "false").lower() in ("true", "1", "yes")
+        if not publishing_enabled:
+            return False, "Live publishing is disabled by kill switch (PUBLISHING_ENABLED=false). Only drafts are permitted."
+
+    # Daily rate limit check
+    site_id = article["site_id"]
+    site = get_site_profile(site_id, db_path=db_path) or {}
+    editorial_rules = site.get("editorial_rules") or {}
+    max_daily = editorial_rules.get("max_posts_per_day", int(os.getenv("MAX_POSTS_PER_DAY", "1")))
+
+    today_count = get_today_publication_count(site_id, db_path=db_path)
+    if today_count >= max_daily:
+        return False, f"Daily publishing limit ({today_count}/{max_daily}) reached for site {site_id}."
 
     return True, "Article passed validation gate and is authorized for publishing."
 
@@ -400,5 +432,121 @@ def get_publication(article_id: int, db_path: Optional[str] = None) -> Optional[
             (article_id,),
         ).fetchone()
         return dict(row) if row else None
+
+
+# --- Workflow Query Helpers ---
+
+def list_topics(
+    site_id: Optional[int] = None,
+    status: Optional[str] = None,
+    db_path: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    with get_connection(db_path) as conn:
+        query = "SELECT * FROM topics WHERE 1=1"
+        params = []
+        if site_id is not None:
+            query += " AND site_id = ?"
+            params.append(site_id)
+        if status is not None:
+            query += " AND status = ?"
+            params.append(status)
+        query += " ORDER BY id ASC"
+        rows = conn.execute(query, params).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_pending_topic_for_research(site_id: int, db_path: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    with get_connection(db_path) as conn:
+        row = conn.execute(
+            "SELECT * FROM topics WHERE site_id = ? AND status = 'DISCOVERED' ORDER BY id ASC LIMIT 1",
+            (site_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_pending_topic_for_writing(site_id: int, db_path: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    with get_connection(db_path) as conn:
+        row = conn.execute(
+            "SELECT * FROM topics WHERE site_id = ? AND status = 'RESEARCHED' ORDER BY id ASC LIMIT 1",
+            (site_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_pending_article_for_validation(site_id: int, db_path: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    with get_connection(db_path) as conn:
+        row = conn.execute(
+            "SELECT * FROM articles WHERE site_id = ? AND status = 'GENERATED' ORDER BY id ASC LIMIT 1",
+            (site_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_pending_article_for_draft(site_id: int, db_path: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    with get_connection(db_path) as conn:
+        row = conn.execute(
+            "SELECT * FROM articles WHERE site_id = ? AND status = 'APPROVED' ORDER BY id ASC LIMIT 1",
+            (site_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+# --- Job History ---
+
+def record_job_start(
+    site_id: Optional[int],
+    job_type: str,
+    details: Optional[Dict[str, Any]] = None,
+    db_path: Optional[str] = None,
+) -> int:
+    with get_connection(db_path) as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO job_history (site_id, job_type, status, details, started_at)
+            VALUES (?, ?, 'RUNNING', ?, CURRENT_TIMESTAMP)
+            """,
+            (site_id, job_type, json.dumps(details or {})),
+        )
+        return cursor.lastrowid
+
+
+def record_job_end(
+    job_id: int,
+    status: str,
+    details: Optional[Dict[str, Any]] = None,
+    db_path: Optional[str] = None,
+) -> None:
+    with get_connection(db_path) as conn:
+        conn.execute(
+            """
+            UPDATE job_history
+            SET status = ?, details = ?, ended_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (status, json.dumps(details or {}), job_id),
+        )
+
+
+def get_pipeline_summary(site_id: Optional[int] = None, db_path: Optional[str] = None) -> Dict[str, Any]:
+    with get_connection(db_path) as conn:
+        where_clause = "WHERE site_id = ?" if site_id is not None else ""
+        params = (site_id,) if site_id is not None else ()
+
+        topics_count = conn.execute(
+            f"SELECT status, count(*) as count FROM topics {where_clause} GROUP BY status", params
+        ).fetchall()
+        articles_count = conn.execute(
+            f"SELECT status, count(*) as count FROM articles {where_clause} GROUP BY status", params
+        ).fetchall()
+        pubs_count = conn.execute(
+            f"SELECT status, count(*) as count FROM publications {where_clause} GROUP BY status", params
+        ).fetchall()
+
+        return {
+            "topics": {row["status"]: row["count"] for row in topics_count},
+            "articles": {row["status"]: row["count"] for row in articles_count},
+            "publications": {row["status"]: row["count"] for row in pubs_count},
+        }
+
 
 
