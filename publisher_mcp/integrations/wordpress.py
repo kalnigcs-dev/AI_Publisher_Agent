@@ -27,6 +27,8 @@ class WordPressClient:
         content_html: str,
         status: str = "draft",  # "draft" or "publish"
         excerpt: Optional[str] = None,
+        categories: Optional[list] = None,
+        tags: Optional[list] = None,
     ) -> Dict[str, Any]:
         """Post article to WordPress. Operates in dry-run mode if unconfigured or DRY_RUN=true."""
         if not self.is_configured() or self.dry_run:
@@ -36,6 +38,8 @@ class WordPressClient:
                 "remote_id": "simulated-wp-999",
                 "link": f"https://example.com/wp-preview/{slug}",
                 "status": status,
+                "categories": categories or [],
+                "tags": tags or [],
                 "message": "Simulated WordPress post creation (DRY_RUN mode active or credentials unconfigured).",
             }
 
@@ -48,6 +52,10 @@ class WordPressClient:
         }
         if excerpt:
             payload["excerpt"] = excerpt
+        if categories:
+            payload["categories"] = categories
+        if tags:
+            payload["tags"] = tags
 
         auth = (self.username, self.app_password)
         with httpx.Client(timeout=30.0) as client:

@@ -27,11 +27,19 @@ def get_connection(db_path: Optional[str] = None) -> sqlite3.Connection:
 
 
 def init_db(db_path: Optional[str] = None) -> None:
-    """Initialize database tables from schema.sql."""
+    """Initialize database tables from schema.sql and apply backward-compatible migrations."""
     with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
         schema_sql = f.read()
     with get_connection(db_path) as conn:
         conn.executescript(schema_sql)
+        try:
+            conn.execute("ALTER TABLE topics ADD COLUMN section TEXT DEFAULT 'general'")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute("ALTER TABLE articles ADD COLUMN section TEXT DEFAULT 'general'")
+        except sqlite3.OperationalError:
+            pass
 
 
 # --- Site Management ---
@@ -96,16 +104,17 @@ def register_topic(
     title: str,
     slug: str,
     target_keyword: str,
+    section: str = "general",
     rationale: Optional[str] = None,
     db_path: Optional[str] = None,
 ) -> int:
     with get_connection(db_path) as conn:
         cursor = conn.execute(
             """
-            INSERT INTO topics (site_id, title, slug, target_keyword, rationale, status)
-            VALUES (?, ?, ?, ?, ?, 'DISCOVERED')
+            INSERT INTO topics (site_id, title, slug, target_keyword, section, rationale, status)
+            VALUES (?, ?, ?, ?, ?, ?, 'DISCOVERED')
             """,
-            (site_id, title, slug, target_keyword, rationale),
+            (site_id, title, slug, target_keyword, section, rationale),
         )
         return cursor.lastrowid
 
@@ -182,11 +191,16 @@ def save_article(
     title: str,
     slug: str,
     content_html: str,
+    section: Optional[str] = None,
     meta_description: Optional[str] = None,
     change_summary: Optional[str] = None,
     db_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     with get_connection(db_path) as conn:
+        if not section:
+            topic_row = conn.execute("SELECT section FROM topics WHERE id = ?", (topic_id,)).fetchone()
+            section = topic_row["section"] if topic_row and topic_row["section"] else "general"
+
         # Check if article already exists for this site and slug
         existing = conn.execute(
             "SELECT id FROM articles WHERE site_id = ? AND slug = ?", (site_id, slug)
@@ -215,19 +229,19 @@ def save_article(
             conn.execute(
                 """
                 UPDATE articles
-                SET title = ?, meta_description = ?, current_version_id = ?, updated_at = CURRENT_TIMESTAMP
+                SET title = ?, meta_description = ?, section = ?, current_version_id = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
-                (title, meta_description, version_id, article_id),
+                (title, meta_description, section, version_id, article_id),
             )
         else:
             # Create article first
             a_cursor = conn.execute(
                 """
-                INSERT INTO articles (topic_id, site_id, title, slug, meta_description, status)
-                VALUES (?, ?, ?, ?, ?, 'GENERATED')
+                INSERT INTO articles (topic_id, site_id, title, slug, section, meta_description, status)
+                VALUES (?, ?, ?, ?, ?, ?, 'GENERATED')
                 """,
-                (topic_id, site_id, title, slug, meta_description),
+                (topic_id, site_id, title, slug, section, meta_description),
             )
             article_id = a_cursor.lastrowid
 

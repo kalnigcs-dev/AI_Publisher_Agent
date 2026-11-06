@@ -91,9 +91,10 @@ def register_topic(
     title: str,
     slug: str,
     target_keyword: str,
+    section: str = "general",
     rationale: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Register a newly proposed article topic into the pipeline."""
+    """Register a newly proposed article topic into the pipeline with a category/section."""
     dupes = db.find_duplicate_topics(site_id=site_id, query_slug=slug, query_keyword=target_keyword)
     if dupes:
         return {
@@ -107,9 +108,10 @@ def register_topic(
         title=title,
         slug=slug,
         target_keyword=target_keyword,
+        section=section,
         rationale=rationale,
     )
-    return {"status": "registered", "topic_id": topic_id, "slug": slug}
+    return {"status": "registered", "topic_id": topic_id, "slug": slug, "section": section}
 
 
 # --- Research Tools ---
@@ -148,6 +150,7 @@ def save_article(
     title: str,
     slug: str,
     content_html: str,
+    section: Optional[str] = None,
     meta_description: Optional[str] = None,
     change_summary: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -158,6 +161,7 @@ def save_article(
         title=title,
         slug=slug,
         content_html=content_html,
+        section=section,
         meta_description=meta_description,
         change_summary=change_summary,
     )

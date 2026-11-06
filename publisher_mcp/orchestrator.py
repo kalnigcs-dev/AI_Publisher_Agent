@@ -94,12 +94,18 @@ class PipelineOrchestrator:
                 db.record_job_end(job_id, "SKIPPED", {"message": msg})
                 return {"status": "skipped", "reason": msg}
 
+            sections = (site.get("editorial_rules") or {}).get(
+                "sections", ["Artificial Intelligence", "Cloud & DevOps", "Software Engineering", "Hardware & Computing"]
+            )
+            sections_str = ", ".join(sections)
+
             prompt = (
                 f"You are the editorial researcher for the website '{site['name']}', focusing on '{niche}'.\n"
-                f"Search the web for emerging, high-intent technical questions or topics in this niche.\n"
+                f"The publication covers the following core tech sections: {sections_str}.\n"
+                f"Search the web for emerging, high-intent technical questions or tutorials in one of these sections.\n"
                 f"Check existing topics using the MCP tool `find_duplicate_topics(site_id={self.site_id}, slug=...)`.\n"
                 f"Once you identify a distinct, original topic, register it using the MCP tool "
-                f"`register_topic(site_id={self.site_id}, title=..., slug=..., target_keyword=..., rationale=...)`.\n"
+                f"`register_topic(site_id={self.site_id}, title=..., slug=..., target_keyword=..., section=..., rationale=...)`.\n"
                 f"Respond with the registered topic details."
             )
             output = self.runner.run_prompt(prompt)
