@@ -2,7 +2,7 @@
 
 > Working title. An autonomous, quality-gated publishing system: an AI coding agent researches, writes and publishes blog articles to WordPress through a custom MCP server.
 
-**Status:** Planning (Milestone 0). Nothing is built yet.
+**Status:** In Progress (Milestones 1–4 implemented and verified).
 
 ---
 
@@ -83,19 +83,19 @@ Every content row is tied to a `site_id`. Slugs are unique per site. Publishing 
 
 ## 7. Milestones
 
-| # | Milestone | Done when |
-|---|---|---|
-| M0 | Decisions made (section 9) | Niche and WordPress hosting chosen |
-| M1 | Environment | Python venv, Git, MCP SDK, `agy` working locally |
-| M2 | Agent capability test | `agy` can use web search, connect to a local MCP server, and run headless (`agy -p`) |
-| M3 | MCP skeleton + SQLite | State tools work across sessions |
-| M4 | Validation + gate | Bad articles are blocked; tests prove it |
-| M5 | WordPress adapter | Draft creation and verification on a test site |
-| M6 | Workflow | Topic -> research -> article -> draft, reviewed by a human |
-| M7 | VM deployment | Same setup runs on the Oracle VM |
-| M8 | Scheduling | systemd timer runs one job unattended |
-| M9 | Autonomous publishing | Enabled on one site with limits and a kill switch |
-| M10 | Analytics | Search Console data feeds improvements |
+| # | Milestone | Status | Done when |
+|---|---|---|---|
+| M0 | Decisions made (section 9) | Open | Niche and WordPress hosting chosen |
+| M1 | Environment | Completed | Python venv, Git, MCP SDK, `agy` working locally |
+| M2 | Agent capability test | Completed | `agy` can use web search, connect to a local MCP server, and run headless (`agy -p`) |
+| M3 | MCP skeleton + SQLite | Completed | State tools work across sessions |
+| M4 | Validation + gate | Completed | Bad articles are blocked; tests prove it |
+| M5 | WordPress adapter | In Progress | Draft creation and verification on a test site (dry-run adapter ready) |
+| M6 | Workflow | Next | Topic -> research -> article -> draft, reviewed by a human |
+| M7 | VM deployment | Queued | Same setup runs on the Oracle VM |
+| M8 | Scheduling | Queued | systemd timer runs one job unattended |
+| M9 | Autonomous publishing | Queued | Enabled on one site with limits and a kill switch |
+| M10 | Analytics | Queued | Search Console data feeds improvements |
 
 Develop and test on the local machine first, then move to the VM.
 
