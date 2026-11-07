@@ -3,6 +3,9 @@
 import os
 import sys
 from typing import Any, Dict, List, Optional
+from dotenv import load_dotenv
+
+load_dotenv()
 from mcp.server.mcpserver import MCPServer
 from publisher_mcp.database import db
 from publisher_mcp.validation.engine import validate_article_content

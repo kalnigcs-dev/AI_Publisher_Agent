@@ -8,10 +8,15 @@ import argparse
 import json
 import logging
 import os
+import shutil
 import subprocess
 import sys
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any, Dict, Optional
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from publisher_mcp.database import db
 from publisher_mcp.server import publish_article, validate_article, verify_publication
@@ -35,8 +40,13 @@ class AgentRunner(ABC):
 class AgyAgentRunner(AgentRunner):
     """Executes Antigravity CLI in headless print mode."""
 
-    def __init__(self, agy_binary: str = "agy"):
-        self.agy_binary = agy_binary
+    def __init__(self, agy_binary: Optional[str] = None):
+        self.agy_binary = (
+            agy_binary
+            or shutil.which("agy")
+            or str(Path.home() / ".local/bin/agy")
+            or "agy"
+        )
 
     def run_prompt(self, prompt: str, timeout: int = 300) -> str:
         logger.info(f"Invoking agy with prompt: {prompt[:80]}...")

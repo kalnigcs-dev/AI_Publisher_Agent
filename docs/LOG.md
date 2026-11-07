@@ -23,3 +23,18 @@
 ### What was learned
 - Antigravity CLI (`agy`) 1.5.2 seamlessly connects to stdio MCP servers configured via `agy mcp add`.
 - Headless execution with `--dangerously-skip-permissions` enables automated pipeline operation.
+
+## 2026-11-07
+
+### What was built
+- Executed the full production pipeline end-to-end:
+  - Topic discovery: Created topic 1 ("Migrating from Ingress-NGINX to Kubernetes Gateway API").
+  - Web research: Stored 5 verified technical sources and extracted evidence in SQLite.
+  - Synthesis: Drafted an 808-word production migration guide with manifests and CLI workflows.
+  - Deterministic validation: Evaluated metadata, HTML hygiene, and research citations (passed 4/4 checks). State transitioned to `APPROVED`.
+  - Publishing gate: Created WordPress draft publication (`simulated-wp-999`) in dry-run mode. State transitioned to `DRAFTED`.
+  - Publication verification: Successfully verified post integrity via `verify_publication`.
+- Verified SQLite persistence: State survived external CLI quota limitations without data loss.
+
+### What was learned
+- Separating AI reasoning from deterministic Python gates ensures that even when an LLM reaches quota or fails mid-stream, work is preserved and resumable at the exact state step.
