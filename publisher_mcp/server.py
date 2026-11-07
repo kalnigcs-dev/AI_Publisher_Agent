@@ -10,6 +10,7 @@ from mcp.server.mcpserver import MCPServer
 from publisher_mcp.database import db
 from publisher_mcp.validation.engine import validate_article_content
 from publisher_mcp.integrations.wordpress import WordPressClient
+from publisher_mcp.integrations.media import generate_featured_banner
 
 # Initialize database schema if not already initialized
 db.init_db()
@@ -244,12 +245,35 @@ def publish_article(article_id: int, as_draft: bool = True) -> Dict[str, Any]:
     target_status = "draft" if as_draft else "publish"
 
     client = WordPressClient()
+
+    # Automatically generate & upload featured image banner
+    featured_media_id = None
+    media_res = None
+    try:
+        section = article.get("section") or "Cloud & DevOps"
+        banner_bytes = generate_featured_banner(
+            title=article["title"],
+            section=section,
+            output_path=f"data/articles/{article['slug']}-banner.png",
+        )
+        media_res = client.upload_media(
+            image_bytes=banner_bytes,
+            filename=f"{article['slug']}-banner.png",
+            mime_type="image/png",
+            alt_text=f"Featured banner for {article['title']}",
+        )
+        featured_media_id = media_res.get("media_id")
+    except Exception as e:
+        # Non-fatal fallback: publishing should proceed even if image generation encounters an issue
+        pass
+
     wp_res = client.create_post(
         title=article["title"],
         slug=article["slug"],
         content_html=article["content_html"],
         status=target_status,
         excerpt=article.get("meta_description"),
+        featured_media_id=featured_media_id,
     )
 
     pub_id = db.record_publication(
@@ -266,6 +290,8 @@ def publish_article(article_id: int, as_draft: bool = True) -> Dict[str, Any]:
         "article_id": article_id,
         "remote_post_id": wp_res.get("remote_id"),
         "remote_url": wp_res.get("link"),
+        "featured_media_id": featured_media_id,
+        "featured_media_url": media_res.get("source_url") if media_res else None,
         "wordpress_status": wp_res.get("status"),
         "dry_run": wp_res.get("dry_run", False),
     }
