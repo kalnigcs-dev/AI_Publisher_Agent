@@ -1,164 +1,302 @@
-# AI Publisher
+# AI Publisher Agent
 
-> Working title. An autonomous, quality-gated publishing system: an AI coding agent researches, writes and publishes blog articles to WordPress through a custom MCP server.
+[![CI Tests](https://img.shields.io/badge/tests-19%20passed-brightgreen.svg)]()
+[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue.svg)]()
+[![Protocol](https://img.shields.io/badge/protocol-MCP%202.x-orange.svg)]()
+[![Integration](https://img.shields.io/badge/integration-WordPress%20REST%20API-informational.svg)]()
+[![License](https://img.shields.io/badge/license-MIT-green.svg)]()
 
-**Status:** In Progress (Milestones 1–4 implemented and verified).
+> **An autonomous, quality-gated technical publishing engine.** Powered by the **Model Context Protocol (MCP)**, **Antigravity CLI (`agy`)**, and a deterministic Python validation gate, publishing to **WordPress** via its REST API.
 
 ---
 
-## 1. Objective
+## 1. Overview & Problem Statement
 
-Build a system that runs a blog (later several niche blogs) with minimal human involvement:
+Autonomous content generation systems frequently suffer from hallucinated claims, poor search ranking penalties, broken markup, and out-of-control publishing loops. 
 
-**Discover topic -> Research -> Write -> Validate -> Publish -> Measure -> Improve**
-
-- **Brain:** Antigravity CLI (`agy`), running on an existing free Google account.
-- **Hands:** a custom Python MCP server that gives the agent persistent state, validation and a controlled publishing path.
-- **Destination:** WordPress sites.
-- **Business goal:** organic search traffic, monetized later (e.g. Google AdSense). Revenue is a hypothesis, not a guarantee.
-- **Personal goal:** understand every component well enough to maintain and reverse it.
-
-## 2. Principles
-
-1. **$0 until revenue justifies spending.** No paid LLM APIs, keyword tools or cloud services.
-2. **Use AI for reasoning, code for everything deterministic.** Duplicate checks, HTML validation and publishing are plain Python.
-3. **No publish without passing validation.** The agent cannot override a failed check.
-4. **State lives in SQLite, not in the chat.** Work must survive quota limits and new sessions.
-5. **Small, reversible steps.** One milestone at a time, committed to Git.
-6. **Quality over volume.** One real niche, original value, sourced claims.
-
-## 3. Architecture
+**AI Publisher Agent** solves this through a strict **separation of concerns**:
+- **Non-Deterministic Cognitive Layer (AI Agent):** Discovers high-intent technical topics, gathers real-world web research, cites authoritative sources, synthesizes deep architectural guides, and generates SVG system diagrams.
+- **Deterministic Code Layer (Python MCP Server):** Manages relational persistence in SQLite, runs uncompromising quality and HTML gates, enforces daily rate limits and kill switches, creates 1200×630px OpenGraph/Google Discover banner artwork, and securely gates all WordPress REST API calls.
 
 ```
-Scheduler (systemd timer)
-        |
-Antigravity CLI (agent: reasoning, search, writing)
-        |  MCP (stdio)
-Publisher MCP server (Python)
-   |-- SQLite (topics, research, articles, publications)
-   |-- Validation engine
-   |-- WordPress adapter (REST API)
-        |
-WordPress site(s)
+                    +------------------------------------+
+                    |       systemd Timer / Scheduler    |
+                    +-----------------+------------------+
+                                      |
+                                      v
+                    +-----------------+------------------+
+                    |  Antigravity CLI (agy / LLM)       |
+                    |  - Topic Discovery & Research      |
+                    |  - Synthesis & Inline SVG Diagrams |
+                    +-----------------+------------------+
+                                      | stdio (MCP Protocol)
+                                      v
+                    +-----------------+------------------+
+                    |       Publisher MCP Server         |
+                    |  +------------------------------+  |
+                    |  | SQLite Relational State      |  |
+                    |  +------------------------------+  |
+                    |  | Deterministic Quality Gate   |  |
+                    |  +------------------------------+  |
+                    |  | Automated Pillow Media Engine|  |
+                    |  +------------------------------+  |
+                    |  | WordPress REST API Client    |  |
+                    +-----------------+------------------+
+                                      | HTTPS / Basic Auth (App Password)
+                                      v
+                    +-----------------+------------------+
+                    |    WordPress Target (Draft Post)   |
+                    +------------------------------------+
 ```
 
-**The agent already has:** web search/fetch, file access, a shell, a language model.
-**We build only:** state tools, validation, the publishing gate.
+---
 
-### Key design rule: the publishing gate
-If the agent can call a WordPress tool directly, it can skip validation. Therefore:
-- `publish_article` lives in **our** server and calls WordPress itself.
-- Direct WordPress publish tools are **not** given to the agent.
-- `publish_article` takes an article ID and refuses unless the stored version passed validation.
+## 2. Core Principles & Guardrails
 
-## 4. Planned MCP tools (v1)
+1. **Deterministic Gatekeeper:** The LLM never holds direct publishing credentials. Posts can **only** be published if their status in SQLite is `APPROVED` by the deterministic validator.
+2. **Strict Editorial Standards (Anti-YMYL):** Zero tolerance for medical, legal, financial advice, or breaking news. The system targets specialized, high-CPC technical fields:
+   - **Artificial Intelligence** (LLMs, vLLM, DeepSeek, Agentic Workflows)
+   - **Cloud & DevOps** (Kubernetes, Gateway API, Ingress, Observability)
+   - **Software Engineering** (Distributed systems, async Python, architecture)
+   - **Hardware & Systems** (Edge computing, local acceleration)
+3. **Evidence-Backed Sourcing:** Articles must reference real research URLs and cite verified technical specifications.
+4. **Rich Visual Assets:** Every article is provisioned with:
+   - A generated 1200×630px OpenGraph banner formatted for Google Discover.
+   - Inline SVG architecture/flow diagrams embedded directly in the content.
+5. **Zero Budget Footprint:** Runs on free Google Gemini tier via Antigravity CLI and Always-Free Oracle/Ubuntu cloud VMs.
 
-| Tool | Purpose |
-|---|---|
-| `list_sites` / `get_site_profile` | Niche, language, audience, editorial rules |
-| `register_topic` | Save a proposed topic |
-| `find_duplicate_topics` | Check overlap with existing topics and posts |
-| `save_research` | Store sources and extracted evidence |
-| `save_article` | Store article content (versioned) |
-| `get_article` | Retrieve an article and its state |
-| `validate_article` | Deterministic checks (see below) |
-| `publish_article` | Gated publish (draft first) |
-| `verify_publication` | Re-fetch the post and confirm it matches |
+---
 
-**Validation checks (initial):** sources present and reachable, duplicate content, valid HTML, title/meta/slug/headings present, internal links resolve, topic not on the restricted list.
+## 3. Article State Machine
 
-## 5. Article states
+Articles advance through discrete, irreversible states stored in SQLite:
 
 ```
-DISCOVERED -> RESEARCHED -> GENERATED -> VALIDATING -> APPROVED
-   -> DRAFTED (on WordPress) -> PUBLISHED -> MONITORING
-Failure: VALIDATION_FAILED | QUARANTINED | PUBLICATION_FAILED
-```
-No direct jump from `GENERATED` to `PUBLISHED`.
-
-## 6. Initial data model (SQLite)
-
-`sites`, `topics`, `research_sources`, `articles`, `article_versions`, `validation_results`, `publications`, `job_history`.
-Every content row is tied to a `site_id`. Slugs are unique per site. Publishing jobs are idempotent.
-
-## 7. Milestones
-
-| # | Milestone | Status | Done when |
-|---|---|---|---|
-| M0 | Decisions made (section 9) | Pending | Niche and WordPress hosting chosen |
-| M1 | Environment | Completed | Python venv, Git, MCP SDK, `agy` working locally |
-| M2 | Agent capability test | Completed | `agy` can use web search, connect to a local MCP server, and run headless (`agy -p`) |
-| M3 | MCP skeleton + SQLite | Completed | State tools work across sessions |
-| M4 | Validation + gate | Completed | Bad articles are blocked; tests prove it |
-| M5 | WordPress adapter | Completed (Dry-Run) | REST API client and dry-run simulation tested; awaiting live site |
-| M6 | Workflow | Completed | Orchestrator drives discovery -> research -> article -> draft |
-| M7 | VM deployment | Ready | Setup script and deployment guide in docs/VM_DEPLOYMENT.md |
-| M8 | Scheduling | Ready | systemd service and timer unit files ready |
-| M9 | Autonomous publishing | Completed | Guardrails, kill switch, and daily limits enforced |
-| M10 | Analytics | Queued | Search Console data feeds improvements |
-
-Develop and test on the local machine first, then move to the VM.
-
-## 8. Repository layout (proposed)
-
-```
-ai-publisher/
-|-- publisher_mcp/
-|   |-- server.py
-|   |-- tools/
-|   |-- database/
-|   |-- validation/
-|   `-- integrations/wordpress.py
-|-- docs/
-|   |-- AGENT_ROLE.md
-|   |-- EDITORIAL_POLICY.md
-|   `-- PUBLISHING_WORKFLOW.md
-|-- data/            # SQLite, gitignored
-|-- tests/
-|-- .agents/mcp_config.json
-|-- .env.example
-|-- .gitignore
-|-- pyproject.toml
-`-- README.md
+[DISCOVERED] ──> [RESEARCHED] ──> [GENERATED] ──> [VALIDATING]
+                                                        │
+                      ┌─────────────────────────────────┴─────────────────┐
+                      ▼                                                   ▼
+                [APPROVED]                                        [VALIDATION_FAILED]
+                      │                                                   │
+                      ▼                                                   ▼
+                  [DRAFTED] (WordPress REST API)                     [QUARANTINED]
+                      │
+                      ▼
+                 [PUBLISHED]
 ```
 
-## 9. Open decisions
+- Any failure during validation immediately halts the pipeline and transitions the article to `VALIDATION_FAILED` or `QUARANTINED`.
+- Quota exhaustion or unexpected API errors trigger non-destructive retries; all state is preserved in SQLite across sessions.
 
-- [ ] **Niche for the pilot site** (audience, search demand, room for original value)
-- [ ] **WordPress hosting:** WordPress.com Free (testing only, no AdSense) vs self-hosted on the Oracle VM (needs a domain for AdSense)
-- [ ] **Language(s)** for the first site
-- [ ] **Topics that are off-limits** for autonomy (medical, legal, financial advice, breaking news)
-- [ ] **Publishing limits** (max posts per day, per site)
-- [ ] **Where the VM lives long-term:** trial shape ends ~early December; move to an Always Free A1 shape or upgrade to Pay As You Go
+---
 
-## 10. Constraints and risks
+## 4. MCP Server Tools
 
-| Risk | Mitigation |
-|---|---|
-| Free-tier `agy` weekly quota | Small tasks, state in SQLite, quota-aware job limits |
-| `agy` headless/auth on a server | Test in M2 before building on it |
-| Low-quality or duplicate AI content hurts search and AdSense approval | Strict validation, one real niche, human review before autonomy |
-| Prompt injection from web pages | Treat fetched content as data, never instructions; only the MCP server authorizes actions |
-| Credentials leaked | `.env` and tokens gitignored, dedicated restricted WordPress user |
-| Trial VM expires | Keep setup scripted and in Git so it can be rebuilt |
-| Unproven assumptions (WordPress MCP unattended writes, AdSense approval, traffic) | Treat as tests, not facts |
+The custom MCP server exposes 14 tools to the agent:
 
-## 11. Compliance notes
+| Category | Tool | Description |
+|---|---|---|
+| **System** | `ping` | Health check probe. |
+| | `get_system_status` | Runtime environment, database connectivity, and version info. |
+| **Site Management** | `list_sites` | Enumerate configured sites and editorial policies. |
+| | `get_site_profile` | Retrieve niche, audience, and editorial constraints. |
+| | `register_site` | Register a new target publication site. |
+| **Topic Research** | `find_duplicate_topics` | Semantic/slug collision check against past articles. |
+| | `register_topic` | Register a new proposed topic for development. |
+| | `save_research` | Persist research URLs, key facts, and verified citations. |
+| | `get_research` | Retrieve stored research notes for an article. |
+| **Draft & State** | `save_article` | Save content, versions, meta descriptions, and tags. |
+| | `get_article` | Retrieve full article state and version history. |
+| **Quality & Gate** | `validate_article` | Execute deterministic checks (word count, structure, YMYL, HTML). |
+| | `publish_article` | Upload media, attach featured banner, and push draft to WordPress. |
+| | `verify_publication` | Fetch post from WordPress and verify parity with database record. |
 
-- Follow Google's people-first and spam policies: no mass-produced unoriginal pages, no fabricated experts or experiences.
-- AdSense approval and revenue are not guaranteed. Never generate artificial traffic or clicks.
-- Each site must have a genuine audience and purpose.
+---
 
-## 12. Setup (to be filled in as built)
+## 5. Repository Structure
+
+```
+AI_Publisher_Agent/
+├── publisher_mcp/                  # Core MCP Server & Pipeline Engine
+│   ├── database/                   # SQLite persistence layer
+│   │   ├── db.py                   # Data access methods & queries
+│   │   ├── schema.sql              # Relational schema (8 tables)
+│   │   └── seed.py                 # Initial site & section seeder
+│   ├── integrations/               # External service adapters
+│   │   ├── wordpress.py            # WordPress REST API client
+│   │   └── media.py                # Pillow banner generator & SVG engine
+│   ├── validation/                 # Quality gate
+│   │   └── engine.py               # HTML, YMYL, header & source validator
+│   ├── orchestrator.py             # CLI runner & step coordinator
+│   └── server.py                   # FastMCP / stdio tool endpoints
+├── local_wordpress/                # Local testing environment
+│   ├── docker-compose.yml          # WordPress + MariaDB compose stack
+│   └── start.sh                    # Automated bridge-network runner
+├── systemd/                        # Automated scheduling
+│   ├── ai-publisher.service        # systemd user service definition
+│   └── ai-publisher.timer          # Periodic timer (runs publishing cycle)
+├── scripts/                        # Utility & deployment scripts
+│   ├── setup_vm.sh                 # Cloud VM bootstrap script
+│   └── run_production_pipeline_sample.py
+├── docs/                           # Documentation
+│   ├── EDITORIAL_POLICY.md         # Content quality & anti-spam guidelines
+│   ├── PUBLISHING_WORKFLOW.md      # End-to-end pipeline walk-through
+│   ├── VM_DEPLOYMENT.md            # Cloud VM & systemd deployment guide
+│   └── LOG.md                      # Milestone & operational changelog
+├── tests/                          # Automated Pytest suite (19 tests)
+├── .env.example                    # Environment variable template
+├── pyproject.toml                  # Python package configuration
+└── README.md                       # Project documentation
+```
+
+---
+
+## 6. Getting Started
+
+### Prerequisites
+- **Python 3.11+** (Python 3.12 or 3.13 recommended)
+- **Git** & **SQLite3**
+- **Docker** (optional, for local WordPress testing)
+- **Antigravity CLI (`agy`)** installed and authenticated
+
+### Installation
 
 ```bash
-# M1
-git clone <repo> && cd ai-publisher
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e .
-cp .env.example .env   # add site settings, never commit
+# 1. Clone repository
+git clone git@github.com:kalnigcs-dev/AI_Publisher_Agent.git
+cd AI_Publisher_Agent
+
+# 2. Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# 3. Install dependencies in editable mode
+pip install --upgrade pip
+pip install -e ".[dev]"
+
+# 4. Configure environment
+cp .env.example .env
+nano .env
 ```
 
-## 13. Working log
+### Environment Configuration (`.env`)
 
-Keep a short dated log in `docs/LOG.md`: what was built, what broke, what was learned.
+```ini
+# Database
+PUBLISHER_DB_PATH=data/publisher.db
+
+# WordPress REST API
+WP_URL=http://localhost:8080
+WP_USERNAME=publisher_admin
+WP_APP_PASSWORD=xxxx xxxx xxxx xxxx
+
+# Operational Controls
+DRY_RUN=false
+PUBLISHING_ENABLED=true
+MAX_POSTS_PER_DAY=3
+LOG_LEVEL=INFO
+```
+
+---
+
+## 7. Running the Pipeline
+
+### Option A: Pipeline CLI Orchestrator
+
+The built-in orchestrator can run individual stages or complete cycles:
+
+```bash
+# Initialize SQLite database
+python -c "from publisher_mcp.database import db; db.init_db()"
+
+# Inspect pipeline summary
+python -m publisher_mcp.orchestrator --step summary
+
+# Run an end-to-end cycle (Discover -> Research -> Write -> Validate -> Draft)
+python -m publisher_mcp.orchestrator --step cycle
+
+# Run individual steps
+python -m publisher_mcp.orchestrator --step discover
+python -m publisher_mcp.orchestrator --step research
+python -m publisher_mcp.orchestrator --step write
+python -m publisher_mcp.orchestrator --step validate
+python -m publisher_mcp.orchestrator --step draft
+```
+
+### Option B: Autonomous Agent Execution (`agy`)
+
+Register the MCP server with the Antigravity agent CLI:
+
+```bash
+# Register MCP server with agy
+agy mcp add publisher -- "$PWD/.venv/bin/python" -m publisher_mcp.server
+
+# Verify MCP connectivity
+agy -p "Call get_system_status on publisher" --dangerously-skip-permissions
+
+# Run autonomous publishing task
+agy -p "Review pending topics in AI Publisher, conduct research, write and validate the next approved draft." --dangerously-skip-permissions
+```
+
+---
+
+## 8. Local WordPress Testing (Docker)
+
+To test end-to-end publishing locally without a live production site:
+
+```bash
+# Start local WordPress and MariaDB containers on port 8080
+./local_wordpress/start.sh
+
+# Open WordPress admin in browser
+# URL: http://localhost:8080/wp-admin
+# Username: test | Password: testpassword
+```
+
+> **Note on Application Passwords:**  
+> When running WordPress over local HTTP, ensure `define('WP_ENVIRONMENT_TYPE', 'local');` is added near line 2 of `/var/www/html/wp-config.php` and Apache forwards Authorization headers (`CGIPassAuth On` in `.htaccess`). The `./local_wordpress/start.sh` script applies these configurations automatically.
+
+---
+
+## 9. VM Deployment & Automation
+
+For unattended 24/7 operation on an Ubuntu Cloud VM (e.g., Oracle Cloud Always-Free tier):
+
+```bash
+# 1. Automated VM provisioning
+bash scripts/setup_vm.sh
+
+# 2. Configure user systemd service and timer
+mkdir -p ~/.config/systemd/user
+cp systemd/ai-publisher.service ~/.config/systemd/user/
+cp systemd/ai-publisher.timer ~/.config/systemd/user/
+
+# 3. Reload and enable timer
+systemctl --user daemon-reload
+systemctl --user enable --now ai-publisher.timer
+
+# 4. Verify scheduled execution
+systemctl --user list-timers
+```
+
+See [docs/VM_DEPLOYMENT.md](docs/VM_DEPLOYMENT.md) for complete details.
+
+---
+
+## 10. Test Suite
+
+Run the full automated test suite covering database operations, deterministic validation, Pillow banner generation, guardrails, and pipeline orchestration:
+
+```bash
+.venv/bin/pytest tests/ -v
+```
+
+```
+============================== 19 passed in 0.64s ==============================
+```
+
+---
+
+## 11. License
+
+MIT License. See [LICENSE](LICENSE) for details.
