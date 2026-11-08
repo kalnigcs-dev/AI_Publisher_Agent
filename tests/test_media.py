@@ -28,7 +28,8 @@ def test_generate_svg_architecture_diagram():
     assert "Service" in svg
 
 
-def test_wordpress_client_media_upload_dry_run():
+def test_wordpress_client_media_upload_dry_run(monkeypatch):
+    monkeypatch.setenv("DRY_RUN", "true")
     client = WordPressClient()
     res = client.upload_media(
         image_bytes=b"dummy-image-bytes",
@@ -41,7 +42,8 @@ def test_wordpress_client_media_upload_dry_run():
     assert "header.png" in res["source_url"]
 
 
-def test_wordpress_client_post_with_featured_media():
+def test_wordpress_client_post_with_featured_media(monkeypatch):
+    monkeypatch.setenv("DRY_RUN", "true")
     client = WordPressClient()
     res = client.create_post(
         title="Article With Media",
